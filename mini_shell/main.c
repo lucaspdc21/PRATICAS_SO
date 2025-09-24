@@ -18,12 +18,41 @@ void parse_command(char *input, char **args, int *background) {
     // Dividir a string em argumentos
     // Verificar se termina com &
     
+    // Capturando o primeiro token
+    args[0] = strtok(input, " ");
+
+    // Percorrendo os tokens restantes
+    int i = 1;
+    while (args[i] != NULL) {
+        i++;
+        args[i] = strtok(NULL, " ");
+    }
 }
 
 void execute_command(char **args, int background) {
     // TODO: Implementar execução
     // Usar fork() e execvp()
     // Gerenciar background se necessário
+
+    // Realizando o fork
+    int retval;
+    retval = fork ();
+
+    if (retval < 0) {
+        // Erro no fork
+        perror("Fork falhou");
+        exit(1);
+    }
+    else{
+        if(retval > 0){// Processo pai
+            last_child_pid = retval; 
+            wait(0);
+        }
+        else{ // Processo filho (retval = 0)
+            execvp(args[0], args);
+        }
+    }
+    //exit(0);
 }
 
 int is_internal_command(char **args) {
