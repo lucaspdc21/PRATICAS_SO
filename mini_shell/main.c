@@ -73,9 +73,24 @@ void execute_command(char **args, int background) {
 }
 
 int is_internal_command(char **args) {
-    // TODO: Verificar se é comando interno
+    // Verificar se é comando interno
     // exit, pid, jobs, wait
-    return 0;
+    
+    int is_internal_command(char **args) {
+    if (args[0] == NULL) return 0;
+
+    // Comando interno exit
+    if (strcmp(args[0], "exit") == 0) {
+        return 1;
+    }
+    // Comando interno pid
+    if (strcmp(args[0], "pid") == 0) {
+        return 1;
+    }
+
+    return 0; // não é comando interno
+}
+
 }
 
 void handle_internal_command(char **args) {
