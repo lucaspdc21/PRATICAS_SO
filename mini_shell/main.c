@@ -14,7 +14,7 @@ int bg_count = 0;
 pid_t last_child_pid = 0; // Armazena PID do último processo filho
 
 void parse_command(char *input, char **args, int *background) {
-    // TODO: Implementar parsing do comando
+    // Implementar parsing do comando
     // Dividir a string em argumentos
     // Verificar se termina com &
 
@@ -40,8 +40,9 @@ void parse_command(char *input, char **args, int *background) {
 void add_background_process(int pid) {
     bg_count < 10 ? (bg_processes[bg_count++] = pid) : (fprintf(stderr, "Limite de processos em background atingido\n"));
 }
+
 void execute_command(char **args, int background) {
-    // TODO: Implementar execução
+    // Implementar execução
     // Usar fork() e execvp()
     // Gerenciar background se necessário
 
@@ -75,26 +76,41 @@ void execute_command(char **args, int background) {
 int is_internal_command(char **args) {
     // Verificar se é comando interno
     // exit, pid, jobs, wait
-    
+
     int is_internal_command(char **args) {
-    if (args[0] == NULL) return 0;
 
-    // Comando interno exit
-    if (strcmp(args[0], "exit") == 0) {
-        return 1;
+        if (args[0] == NULL) return 0;
+
+        // Comando interno exit
+        if (strcmp(args[0], "exit") == 0) {
+            return 1;
+        }
+        
+        // Comando interno pid
+        if (strcmp(args[0], "pid") == 0) {
+            return 1;
+        }
+
+        return 0; // não é comando interno
     }
-    // Comando interno pid
-    if (strcmp(args[0], "pid") == 0) {
-        return 1;
-    }
-
-    return 0; // não é comando interno
-}
-
 }
 
 void handle_internal_command(char **args) {
     // TODO: Executar comandos internos
+
+    if (strcmp(args[0], "exit") == 0) {
+        printf("Saindo do shell...\n");
+        exit(0);  // encerra o shell
+    }
+
+    else if (strcmp(args[0], "pid") == 0) {
+        printf("PID do shell: %d\n", getpid());
+        if (last_child_pid != 0) {
+            printf("PID do último processo filho: %d\n", last_child_pid);
+        } else {
+            printf("Nenhum processo filho executado ainda.\n");
+        }
+    }
 }
 
 
