@@ -49,6 +49,26 @@ void add_background_process(int pid) {
     bg_count < 10 ? (bg_processes[bg_count++] = pid) : (fprintf(stderr, "Limite de processos em background atingido\n"));
 }
 
+void clean_finished_processes() {
+    int status;
+    pid_t pid;
+    // WNOHANG = não bloqueia se nenhum processo terminou
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        // Remove da lista de background
+        for (int i = 0; i < bg_count; i++) {
+            if (bg_processes[i] == pid) {
+                printf("[%d]+ Done\n", i+1);
+                // Remove elemento da lista
+                for (int j = i; j < bg_count - 1; j++) {
+                    bg_processes[j] = bg_processes[j+1];
+                }
+                bg_count--;
+                break;
+            }
+        }
+    }
+}
+
 void execute_command(char **args, int background) {
     // Implementar execução
     // Usar fork() e execvp()
@@ -102,6 +122,16 @@ int is_internal_command(char **args) {
         return 1;
     }
 
+    // Comando interno pid
+    if (strcmp(args[0], "jobs") == 0) {
+        return 1;
+    }
+
+    // Comando interno pid
+    if (strcmp(args[0], "wait") == 0) {
+        return 1;
+    }
+
     return 0; // não é comando interno
     
 }
@@ -122,6 +152,38 @@ void handle_internal_command(char **args) {
             printf("Nenhum processo filho executado ainda.\n");
         }
     }
+
+    else if (strcmp(args[0], "jobs") == 0) {
+        if (bg_count == 0) {
+            printf("Nenhum processo em background\n");
+        } else {
+            printf("Processos em background:\n");
+            for (int i = 0; i < bg_count; i++) {
+                printf("[%d] %d Running\n", i+1, bg_processes[i]);
+            }
+        }
+    }
+
+    else if (strcmp(args[0], "wait") == 0) {
+        printf("Aguardando processos em background...\n");
+        while (bg_count > 0) {
+            int status;
+            pid_t pid = wait(&status); // Bloqueia até um processo terminar
+            // Remove da lista (código similar ao clean_finished_processes)
+            for (int i = 0; i < bg_count; i++) {
+                if (bg_processes[i] == pid) {
+                    printf("[%d]+ Done\n", i+1);
+                    // Remove elemento da lista
+                    for (int j = i; j < bg_count - 1; j++) {
+                        bg_processes[j] = bg_processes[j+1];
+                    }
+                    bg_count--;
+                    break;
+                }
+            }
+        }
+        printf("Todos os processos terminaram\n");
+    }
 }
 
 
@@ -134,7 +196,9 @@ int main() {
     printf("Digite 'exit' para sair\n\n");
 
     while (1) {
-        printf("minishell> ");
+        clean_finished_processes(); // Limpa processos terminados
+        
+        printf("\033[1;32mminishell> \033[0m");
         fflush(stdout);
 
         // Ler entrada do usuário
