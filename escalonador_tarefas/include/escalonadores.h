@@ -1,3 +1,17 @@
+#ifndef ESCALONADORES_H
+#define ESCALONADORES_H
+
+typedef struct {
+    int id;
+    int arrival_time;
+    int burst_time;
+    int remaining_time;
+    int completion_time;
+    int waiting_time;
+    int turnaround_time;
+    int finished;
+} Processo;
+
 // First Come, First Served
 int* fcfs(int* tasks, int qtd_task);
 
@@ -14,7 +28,9 @@ int* prioc(int* tasks, int qtd_taskd);
 int* priop(int* tasks, int qtd_taskd);
 
 // Round-Robin clássico (sem prioridade)
-int* rr(int* tasks, int qtd_taskd, int quantum);
+int* rr(Processo* processos, int qtd_proc, int quantum);
 
-// Round-Robin com prioridade e aging
-int* rr_d(int* tasks, int qtd_taskd, int quantum, int alfa);
+// Round-Robin com prioridade e envelhecimento
+int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging);
+
+#endif
