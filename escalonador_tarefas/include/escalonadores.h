@@ -9,6 +9,7 @@ typedef struct {
     int completion_time;
     int waiting_time;
     int turnaround_time;
+    int prioridade;
     int finished;
 } Processo;
 

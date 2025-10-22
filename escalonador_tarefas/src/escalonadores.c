@@ -135,7 +135,7 @@ int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging) {
     // Vetor de prioridades dinâmicas (inicio com prioridade estática fornecida)
     int* prioridade_dinamica = malloc(qtd_proc * sizeof(int));
     for (int i = 0; i < qtd_proc; i++)
-        prioridade_dinamica[i] = /* Precisa carregar da entrada (ex: processos[i].prioridade), */ 1;
+        prioridade_dinamica[i] = processos[i].prioridade;
 
     int* em_fila = calloc(qtd_proc, sizeof(int));
     FilaElem* fila = malloc(qtd_proc * sizeof(FilaElem));
@@ -190,7 +190,7 @@ int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging) {
         for (int f = 1; f < fila_sz; f++) { // começa de 1 pois 0 é o processo que acabou de rodar
             int proc_idx = fila[f].idx;
             prioridade_dinamica[proc_idx] -= aging;
-            if (prioridade_dinamica[proc_idx] < 0) prioridade_dinamica[proc_idx] = 0; // Garante prioridade positiva
+            if (prioridade_dinamica[proc_idx] < 0) prioridade_dinamica[proc_idx] = 0; // Garante prioridade não-negativa
             fila[f].prioridade = prioridade_dinamica[proc_idx]; // Atualiza na fila
         }
 
