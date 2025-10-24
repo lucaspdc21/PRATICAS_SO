@@ -1,3 +1,4 @@
+#include<limits.h>
 #ifndef ESCALONADORES_H
 #define ESCALONADORES_H
 
@@ -14,19 +15,19 @@ typedef struct {
 } Processo;
 
 // First Come, First Served
-int* fcfs(int* tasks, int qtd_task);
+int* fcfs(Processo* processos, int qtd_task);
 
 // Shortest Job First
-int* sjf(int* tasks, int qtd_task);
+int* sjf(Processo* processos, int qtd_task);
 
 // Shortest Remaining Time First
-int* srtf(int* tasks, int qtd_task);
+int* srtf(Processo* processos, int qtd_task);
 
 // Prioridade cooperativo
-int* prioc(int* tasks, int qtd_taskd);
+int* prioc(Processo* processos, int qtd_taskd);
 
 // Prioridade preemptivo
-int* priop(int* tasks, int qtd_taskd);
+int* priop(Processo* processos, int qtd_taskd);
 
 // Round-Robin clássico (sem prioridade)
 int* rr(Processo* processos, int qtd_proc, int quantum);
