@@ -33,7 +33,7 @@ A entrada e a saída dos dados são feitas exclusivamente em arquivos no formato
     - [ ] Tempo médio de espera (waiting time, tw)
     - [ ] Número de trocas de contexto 
     - [ ] Diagrama de tempo da execução
-- [ ] Configuração por arquivo texto em formato:
+- [x] Configuração por arquivo texto em formato:
     ```quantum:2 aging:1```
 - [ ] Utilização e correta integração da biblioteca cJSON para leitura e escrita de JSON 
 - [ ]Código devidamente comentado 
