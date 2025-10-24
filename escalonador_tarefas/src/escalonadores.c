@@ -1,14 +1,110 @@
 #include "../include/escalonadores.h"
 #include <stdlib.h>
 
+void ordenar_por_chegada(Processo p[], int n) {
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = i + 1; j < n; j++) {
+            if (p[j].arrival_time < p[i].arrival_time) {
+                Processo tmp = p[i];
+                p[i] = p[j];
+                p[j] = tmp;
+            }
+        }
+    }
+}
+
 // First Come, First Served
 int* fcfs(Processo* processos, int qtd_task) {
-    // TODO
+    ordenar_por_chegada(processos, qtd_task);
+    int tempo = 0;
+    int tempo_total_estimado = 0;
+
+    // calcula tempo total aproximado
+    for (int i = 0; i < qtd_task; i++) {
+        tempo_total_estimado += processos[i].burst_time;
+    }
+    tempo_total_estimado += processos[qtd_task - 1].arrival_time;
+
+    // aloca timeline com valores -1
+    int* timeline = (int*) malloc(sizeof(int) * tempo_total_estimado);
+    for (int t = 0; t < tempo_total_estimado; t++)
+        timeline[t] = -1;
+
+    for (int i = 0; i < qtd_task; i++) {
+        if (tempo < processos[i].arrival_time)
+            tempo = processos[i].arrival_time;
+
+        for (int t = 0; t < processos[i].burst_time; t++) {
+            timeline[tempo] = processos[i].id; // marca qual processo roda nesse tempo
+            tempo++;
+        }
+
+        processos[i].completion_time = tempo;
+        processos[i].turnaround_time = processos[i].completion_time - processos[i].arrival_time;
+        processos[i].waiting_time = processos[i].turnaround_time - processos[i].burst_time;
+    }
+
+    // retorna timeline (vetor de IDs)
+    return timeline;
+}
+
+// Função auxiliar: encontra o índice do processo disponível com menor burst
+int menor_burst_disponivel(Processo p[], int n, int tempo) {
+    int idx = -1;
+    int menor_burst = 1e9;
+
+    for (int i = 0; i < n; i++) {
+        if (!p[i].finished && p[i].arrival_time <= tempo) {
+            if (p[i].burst_time < menor_burst) {
+                menor_burst = p[i].burst_time;
+                idx = i;
+            }
+        }
+    }
+    return idx;
 }
 
 // Shortest Job First
 int* sjf(Processo* processos, int qtd_task) {
-    // TODO
+    for (int i = 0; i < qtd_task; i++) {
+        processos[i].remaining_time = processos[i].burst_time;
+        processos[i].finished = 0;
+    }
+
+    int tempo = 0, concluidos = 0;
+
+    // Estimativa do tempo total para alocação do vetor timeline
+    int tempo_estimado = 0;
+    for (int i = 0; i < qtd_task; i++)
+        tempo_estimado += processos[i].burst_time;
+
+    // Aloca timeline (cada posição indica qual processo roda naquele instante)
+    int* timeline = (int*)calloc(tempo_estimado * 2, sizeof(int));
+
+    while (concluidos < qtd_task) {
+        int idx = menor_burst_disponivel(processos, qtd_task, tempo);
+        if (idx == -1) { 
+            timeline[tempo] = -1; // CPU ociosa
+            tempo++; 
+            continue; 
+        }
+
+        for (int t = 0; t < processos[idx].burst_time; t++) {
+            timeline[tempo] = processos[idx].id;
+            tempo++;
+        }
+
+        processos[idx].completion_time = tempo;
+        processos[idx].turnaround_time = processos[idx].completion_time - processos[idx].arrival_time;
+        processos[idx].waiting_time = processos[idx].turnaround_time - processos[idx].burst_time;
+        processos[idx].finished = 1;
+        concluidos++;
+    }
+
+    // Opcional: realocar timeline para tamanho exato
+    timeline = realloc(timeline, tempo * sizeof(int));
+
+    return timeline;
 }
 
 // Shortest Remaining Time First
