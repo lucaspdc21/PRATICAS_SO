@@ -1,21 +1,6 @@
 #include "escalonadores.h"
 #include <stdlib.h>
 
-// Estrutura auxiliar para guardar prioridade dinâmica durante a execução
-typedef struct {
-    int idx;
-    int prioridade;
-    int chegada; // tempo de chegada original (para desempate)
-} FilaElem;
-
-// Função de comparação de prioridades (menor valor = maior prioridade)
-int cmp_fila(const void* a, const void* b) {
-    FilaElem *fa = (FilaElem*)a, *fb = (FilaElem*)b;
-    if (fa->prioridade != fb->prioridade)
-        return fa->prioridade - fb->prioridade; // menor prioridade vem antes
-    return fa->chegada - fb->chegada; // desempate por ordem de chegada
-}
-
 // First Come, First Served
 int* fcfs(int* tasks, int qtd_task) {
     // TODO
@@ -43,10 +28,33 @@ int* priop(int* tasks, int qtd_taskd) {
 
 /*
  * Algoritmo de Round-Robin clássico (sem prioridade).
- * Recebe um vetor de processos, quantidade de processos e o quantum.
- * O vetor de processos deve estar inicializado (inclusive remaining_time = burst_time).
- * Retorna um vetor com os tempos de conclusão de cada processo.
+ * Recebe vetor de Processos, quantidade de processos e quantum.
+ * O vetor de Processos deve ter remaining_time = burst_time.
+ * Retorna vetor com tempos de conclusão de cada processo.
+ * Também coleta a timeline (histórico das trocas de contexto).
  */
+typedef struct {
+    int tempo_inicio;
+    int pid;
+} Evento;
+
+Evento* timeline_rr = NULL;
+int timeline_rr_sz = 0;
+int timeline_rr_cap = 0;
+
+void rr_add_event(int tempo, int pid) {
+    if (timeline_rr_cap == 0) {
+        timeline_rr_cap = 128;
+        timeline_rr = malloc(timeline_rr_cap * sizeof(Evento));
+    } else if (timeline_rr_sz == timeline_rr_cap) {
+        timeline_rr_cap *= 2;
+        timeline_rr = realloc(timeline_rr, timeline_rr_cap * sizeof(Evento));
+    }
+    timeline_rr[timeline_rr_sz].tempo_inicio = tempo;
+    timeline_rr[timeline_rr_sz].pid = pid;
+    timeline_rr_sz++;
+}
+
 int* rr(Processo* processos, int qtd_proc, int quantum) {
     int* completion_times = malloc(qtd_proc * sizeof(int));
     int processos_finalizados = 0;
@@ -54,9 +62,11 @@ int* rr(Processo* processos, int qtd_proc, int quantum) {
     int* fila = malloc(qtd_proc * sizeof(int));
     int frente = 0, tras = 0;
     int* em_fila = calloc(qtd_proc, sizeof(int));
-    int ultimo_em_execucao = -1;
+    int ultimo_processo = -1;
 
-    // Enfileira processos que chegam no tempo zero
+    timeline_rr_sz = 0; // zera a timeline global
+
+    // Enfileira processos com chegada zero
     for (int i = 0; i < qtd_proc; i++) {
         if (processos[i].arrival_time == 0) {
             fila[tras++] = i;
@@ -66,39 +76,41 @@ int* rr(Processo* processos, int qtd_proc, int quantum) {
 
     while (processos_finalizados < qtd_proc) {
         if (frente == tras) {
-            // Nenhum processo pronto, avança tempo ao próximo arrival
-            int proximo_arrival = -1;
-            for (int i = 0; i < qtd_proc; i++) {
-                if (!processos[i].finished && processos[i].arrival_time > tempo_atual) {
-                    if (proximo_arrival == -1 || processos[i].arrival_time < proximo_arrival)
-                        proximo_arrival = processos[i].arrival_time;
-                }
-            }
-            tempo_atual = proximo_arrival;
-            for (int i = 0; i < qtd_proc; i++) {
+            // Avança tempo até alguém chegar
+            int prox = -1;
+            for (int i = 0; i < qtd_proc; i++)
+                if (!processos[i].finished && processos[i].arrival_time > tempo_atual &&
+                    (prox == -1 || processos[i].arrival_time < processos[prox].arrival_time))
+                    prox = i;
+            tempo_atual = processos[prox].arrival_time;
+            for (int i = 0; i < qtd_proc; i++)
                 if (!em_fila[i] && !processos[i].finished && processos[i].arrival_time <= tempo_atual) {
                     fila[tras++] = i;
                     em_fila[i] = 1;
                 }
-            }
             continue;
         }
 
         int idx = fila[frente++];
         Processo *p = &processos[idx];
 
+        // Registra na timeline se houve troca de contexto
+        if (ultimo_processo != idx) {
+            rr_add_event(tempo_atual, p->id);
+            ultimo_processo = idx;
+        }
+
         // Executa quantum ou até o fim
         int tempo_exec = (p->remaining_time > quantum) ? quantum : p->remaining_time;
         tempo_atual += tempo_exec;
         p->remaining_time -= tempo_exec;
 
-        // Verifica se novos processos chegaram nesse intervalo e enfileira
-        for (int i = 0; i < qtd_proc; i++) {
+        // Entrada de processos durante esse quantum
+        for (int i = 0; i < qtd_proc; i++)
             if (!em_fila[i] && !processos[i].finished && processos[i].arrival_time <= tempo_atual) {
                 fila[tras++] = i;
                 em_fila[i] = 1;
             }
-        }
 
         if (p->remaining_time == 0) {
             p->completion_time = tempo_atual;
@@ -108,10 +120,8 @@ int* rr(Processo* processos, int qtd_proc, int quantum) {
             processos_finalizados++;
             completion_times[idx] = p->completion_time;
         } else {
-            fila[tras++] = idx; // Reenfileira processo
+            fila[tras++] = idx;
         }
-
-        ultimo_em_execucao = idx;
     }
 
     free(fila);
@@ -120,19 +130,54 @@ int* rr(Processo* processos, int qtd_proc, int quantum) {
 }
 
 /*
-* Algoritmo de Round-Robin com prioridade e envelhecimento.
-* Recebe um vetor de processos, quantidade de processos, quantum e valor de aging.
-* O vetor de processos deve estar inicializado (inclusive remaining_time = burst_time e prioridade estática preenchida).
-* A fila de execução é ordenada por prioridade dinâmica, atualizada a cada quantum por aging.
-* Não há preempção por prioridade: o processo roda até o fim do quantum, depois a fila é reordenada.
-* Retorna um vetor com os tempos de conclusão de cada processo.
-*/
+ * Algoritmo de Round-Robin com prioridade e envelhecimento.
+ * Recebe vetor de Processos, quantidade de processos, quantum e valor de aging.
+ * O vetor de Processos deve ter remaining_time = burst_time e prioridade preenchida.
+ * Fila ordenada por prioridade dinâmica, atualizada a cada quantum.
+ * Não há preempção por prioridade (apenas rotina de RR).
+ * Retorna vetor com tempos de conclusão de cada processo.
+ * Também coleta o diagrama de tempo (timeline).
+ */
+// Estrutura auxiliar para guardar prioridade dinâmica durante a execução
+typedef struct {
+    int idx;
+    int prioridade;
+    int chegada; // tempo de chegada original (para desempate)
+} FilaElem;
+
+// Função de comparação de prioridades (menor valor = maior prioridade)
+int cmp_fila(const void* a, const void* b) {
+    FilaElem *fa = (FilaElem*)a, *fb = (FilaElem*)b;
+    if (fa->prioridade != fb->prioridade)
+        return fa->prioridade - fb->prioridade; // menor prioridade vem antes
+    return fa->chegada - fb->chegada; // desempate por ordem de chegada
+}
+
+Evento* timeline_rrd = NULL;
+int timeline_rrd_sz = 0;
+int timeline_rrd_cap = 0;
+
+void rrd_add_event(int tempo, int pid) {
+    if (timeline_rrd_cap == 0) {
+        timeline_rrd_cap = 128;
+        timeline_rrd = malloc(timeline_rrd_cap * sizeof(Evento));
+    } else if (timeline_rrd_sz == timeline_rrd_cap) {
+        timeline_rrd_cap *= 2;
+        timeline_rrd = realloc(timeline_rrd, timeline_rrd_cap * sizeof(Evento));
+    }
+    timeline_rrd[timeline_rrd_sz].tempo_inicio = tempo;
+    timeline_rrd[timeline_rrd_sz].pid = pid;
+    timeline_rrd_sz++;
+}
+
 int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging) {
     int time = 0;
     int* completion_times = malloc(qtd_proc * sizeof(int));
     int processos_finalizados = 0;
 
-    // Vetor de prioridades dinâmicas (inicio com prioridade estática fornecida)
+    timeline_rrd_sz = 0; // zera a timeline global
+    int ultimo_processo = -1;
+
     int* prioridade_dinamica = malloc(qtd_proc * sizeof(int));
     for (int i = 0; i < qtd_proc; i++)
         prioridade_dinamica[i] = processos[i].prioridade;
@@ -141,7 +186,7 @@ int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging) {
     FilaElem* fila = malloc(qtd_proc * sizeof(FilaElem));
     int fila_sz = 0;
 
-    // Inicializa a fila com processos que chegam no tempo zero
+    // Inicializa fila com processos que chegam em t=0
     for (int i = 0; i < qtd_proc; i++) {
         if (processos[i].arrival_time == 0) {
             fila[fila_sz++] = (FilaElem){.idx = i, .prioridade = prioridade_dinamica[i], .chegada = processos[i].arrival_time};
@@ -150,7 +195,6 @@ int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging) {
     }
 
     while (processos_finalizados < qtd_proc) {
-        // Caso a fila esteja vazia, avança tempo para o próximo processo
         if (fila_sz == 0) {
             int proximo = -1;
             for (int i = 0; i < qtd_proc; i++)
@@ -166,35 +210,36 @@ int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging) {
             continue;
         }
 
-        // Ordena a fila por prioridade dinâmica (e chegada)
         qsort(fila, fila_sz, sizeof(FilaElem), cmp_fila);
 
-        // Seleciona o primeiro processo da fila
         int idx = fila[0].idx;
-        Processo *p = &processos[idx];
+        Processo* p = &processos[idx];
 
-        // Executa quantum ou até o fim
+        // Registra diagrama de tempo
+        if (ultimo_processo != idx) {
+            rrd_add_event(time, p->id);
+            ultimo_processo = idx;
+        }
+
         int exec_time = (p->remaining_time > quantum) ? quantum : p->remaining_time;
         time += exec_time;
         p->remaining_time -= exec_time;
 
-        // Enfileira processos que chegaram durante esse quantum
-        for (int i = 0; i < qtd_proc; i++) {
+        // Entrada de processos durante quantum
+        for (int i = 0; i < qtd_proc; i++)
             if (!em_fila[i] && !processos[i].finished && processos[i].arrival_time <= time) {
                 fila[fila_sz++] = (FilaElem){.idx = i, .prioridade = prioridade_dinamica[i], .chegada = processos[i].arrival_time};
                 em_fila[i] = 1;
             }
-        }
 
-        // Aging: todos os processos esperando na fila (exceto o executado) "sobem" em prioridade
-        for (int f = 1; f < fila_sz; f++) { // começa de 1 pois 0 é o processo que acabou de rodar
+        // Aging dos demais processos na fila
+        for (int f = 1; f < fila_sz; f++) {
             int proc_idx = fila[f].idx;
             prioridade_dinamica[proc_idx] -= aging;
-            if (prioridade_dinamica[proc_idx] < 0) prioridade_dinamica[proc_idx] = 0; // Garante prioridade não-negativa
-            fila[f].prioridade = prioridade_dinamica[proc_idx]; // Atualiza na fila
+            if (prioridade_dinamica[proc_idx] < 0) prioridade_dinamica[proc_idx] = 0;
+            fila[f].prioridade = prioridade_dinamica[proc_idx];
         }
 
-        // Processo terminou?
         if (p->remaining_time == 0) {
             p->completion_time = time;
             p->turnaround_time = p->completion_time - p->arrival_time;
@@ -202,19 +247,16 @@ int* rr_d(Processo* processos, int qtd_proc, int quantum, int aging) {
             p->finished = 1;
             processos_finalizados++;
             completion_times[idx] = p->completion_time;
-
             // Remove processo da fila
             for (int f = 0; f < fila_sz-1; f++) fila[f] = fila[f+1];
             fila_sz--;
         } else {
-            // Move processo para o final da fila (regra do RR)
+            // Reinfileira o processo
             FilaElem atual = fila[0];
             for (int f = 0; f < fila_sz-1; f++) fila[f] = fila[f+1];
-            fila[fila_sz-1] = atual; // re-insere no final
-            // prioridade já foi atualizada
+            fila[fila_sz-1] = atual;
         }
     }
-
     free(prioridade_dinamica);
     free(fila);
     free(em_fila);
