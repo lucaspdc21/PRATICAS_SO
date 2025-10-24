@@ -19,7 +19,7 @@ int* srtf(Processo *novo, int qtd_task) {
     pronto_tras = -1,
     finalizado_tras = -1,
     index_menor, menor_restante;
-    Processo *pronto[qtd_task], *finalizado[qtd_task];
+    Processo *pronto[qtd_task];
 
     for (int i = 0; i < qtd_task; ++i) {
         exec_time += novo[i].burst_time;
@@ -59,22 +59,22 @@ int* srtf(Processo *novo, int qtd_task) {
         // Executa uma unidade de tempo
         pronto[index_menor]->remaining_time--;
         int pid = pronto[index_menor]->id;
-        timeline[pid * exec_time + tempo] = 1;
+        timeline[pid * exec_time + tempo] = 2;
         tempo++;
 
         // Se processo terminou
         if (pronto[index_menor]->remaining_time == 0) {
             pronto[index_menor]->completion_time = tempo;
-            finalizado[++finalizado_tras] = pronto[index_menor];
+            pronto[index_menor]->finished = 1;
             pronto[index_menor] = pronto[pronto_tras--];
             proc_concluidos++;
         }
+    }
 
-        // Calcula turnaround e waiting time
-        for (int i = 0; i < qtd_task; i++) {
-            novo[i].turnaround_time = novo[i].completion_time - novo[i].arrival_time;
-            novo[i].waiting_time = novo[i].turnaround_time - novo[i].burst_time;
-        }
+    // Calcula turnaround e waiting time
+    for (int i = 0; i < qtd_task; i++) {
+        novo[i].turnaround_time = novo[i].completion_time - novo[i].arrival_time;
+        novo[i].waiting_time = novo[i].turnaround_time - novo[i].burst_time;
     }
 
     return timeline;
