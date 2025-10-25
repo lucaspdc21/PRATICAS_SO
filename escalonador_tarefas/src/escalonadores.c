@@ -16,9 +16,10 @@ int* srtf(Processo *novo, int qtd_task) {
     int tempo = 0,
     proc_concluidos = 0,
     exec_time = 0,
+    pid,
     pronto_tras = -1,
     finalizado_tras = -1,
-    index_menor, menor_restante;
+    index_maior, menor_restante;
     Processo *pronto[qtd_task];
 
     for (int i = 0; i < qtd_task; ++i) {
@@ -42,31 +43,31 @@ int* srtf(Processo *novo, int qtd_task) {
         }
 
         // Seleciona processo com menor tempo restante
-        index_menor = -1, menor_restante = INT_MAX;
+        index_maior = -1, menor_restante = INT_MAX;
         for (int i = 0; i <= pronto_tras; ++i) {
             if (pronto[i]->remaining_time < menor_restante) {
                 menor_restante = pronto[i]->remaining_time;
-                index_menor = i;
+                index_maior = i;
             }
         }
 
         // Nenhum processo pronto, CPU ociosa
-        if (index_menor == -1) {
+        if (index_maior == -1) {
             tempo++;
             continue;
         }
 
         // Executa uma unidade de tempo
-        pronto[index_menor]->remaining_time--;
-        int pid = pronto[index_menor]->id;
+        pronto[index_maior]->remaining_time--;
+        pid = pronto[index_maior]->id;
         timeline[pid * exec_time + tempo] = 2;
         tempo++;
 
         // Se processo terminou
-        if (pronto[index_menor]->remaining_time == 0) {
-            pronto[index_menor]->completion_time = tempo;
-            pronto[index_menor]->finished = 1;
-            pronto[index_menor] = pronto[pronto_tras--];
+        if (pronto[index_maior]->remaining_time == 0) {
+            pronto[index_maior]->completion_time = tempo;
+            pronto[index_maior]->finished = 1;
+            pronto[index_maior] = pronto[pronto_tras--];
             proc_concluidos++;
         }
     }
@@ -81,13 +82,144 @@ int* srtf(Processo *novo, int qtd_task) {
 }
 
 // Prioridade cooperativo
-int* prioc(Processo* processos, int qtd_taskd) {
-    // TODO
+int* prioc(Processo* novo, int qtd_task) {
+    int tempo = 0,
+    tempo_ant = 0,
+    pid, tempo_proc,
+    proc_concluidos = 0,
+    exec_time = 0,
+    pronto_tras = -1,
+    index_maior, maior_prioridade;
+    Processo *pronto[qtd_task];
+    for (int i = 0; i < qtd_task; ++i) {
+        exec_time += novo[i].burst_time;
+        novo[i].remaining_time = novo[i].burst_time;
+        novo[i].finished = 0;
+    }
+    int* timeline = calloc(qtd_task * exec_time, sizeof(int));
+
+    while(proc_concluidos < qtd_task) {
+        // Adiciona os processos novos que chegaram no array pronto
+        for (int i = 0; i < qtd_task; ++i) {
+            if (novo[i].finished != 1
+                && novo[i].arrival_time <= tempo
+                && novo[i].arrival_time >= tempo_ant)
+                pronto[++pronto_tras] = &novo[i];
+        }
+
+        // Marcando processos prontos, mas não executados
+        for (int i = 0; i <= pronto_tras; i++) {
+            int pid = pronto[i]->id;
+            timeline[pid * exec_time + tempo] = 1;
+        }
+
+        // Seleciona processo com maior prioridade
+        index_maior = -1, maior_prioridade = -1;
+        for (int i = 0; i <= pronto_tras; ++i) {
+            if (pronto[i]->prioridade > maior_prioridade) {
+                maior_prioridade = pronto[i]->prioridade;
+                index_maior = i;
+            }
+        }
+
+        // Nenhum processo pronto, CPU ociosa
+        if (index_maior == -1) {
+            tempo++;
+            continue;
+        }
+
+        // Executa o processo e finaliza-o
+        tempo_ant = tempo + 1;
+        tempo_proc = tempo + pronto[index_maior]->remaining_time;
+        for (int i = tempo; i < tempo_proc; ++i) {
+            pronto[index_maior]->remaining_time--;
+            pid = pronto[index_maior]->id;
+            timeline[pid * exec_time + tempo] = 2;
+            tempo++;
+        }
+        pronto[index_maior]->completion_time = tempo;
+        pronto[index_maior]->finished = 1;
+        pronto[index_maior] = pronto[pronto_tras--];
+        proc_concluidos++;
+    }
+
+    // Calcula turnaround e waiting time
+    for (int i = 0; i < qtd_task; i++) {
+        novo[i].turnaround_time = novo[i].completion_time - novo[i].arrival_time;
+        novo[i].waiting_time = novo[i].turnaround_time - novo[i].burst_time;
+    }
+
+    return timeline;
 }
 
 // Prioridade preemptivo
-int* priop(Processo* processos, int qtd_taskd) {
-    // TODO
+int* priop(Processo* novo, int qtd_task) {
+    int tempo = 0,
+    proc_concluidos = 0,
+    exec_time = 0,
+    pid,
+    pronto_tras = -1,
+    finalizado_tras = -1,
+    index_maior, maior_prioridade;
+    Processo *pronto[qtd_task];
+
+    for (int i = 0; i < qtd_task; ++i) {
+        exec_time += novo[i].burst_time;
+        novo[i].remaining_time = novo[i].burst_time;
+        novo[i].finished = 0;
+    }
+    int* timeline = calloc(qtd_task * exec_time, sizeof(int));
+
+    while (proc_concluidos < qtd_task) {
+        // Adiciona os processos do tempo atual no pronto
+        for (int i = 0; i < qtd_task; ++i) {
+            if (novo[i].finished != 1 && novo[i].arrival_time == tempo)
+                pronto[++pronto_tras] = &novo[i];
+        }
+
+        // Marcando processos prontos, mas não executados
+        for (int i = 0; i <= pronto_tras; i++) {
+            int pid = pronto[i]->id;
+            timeline[pid * exec_time + tempo] = 1;
+        }
+
+        // Seleciona processo com maior prioridade
+        index_maior = -1, maior_prioridade = -1;
+        for (int i = 0; i <= pronto_tras; ++i) {
+            if (pronto[i]->prioridade > maior_prioridade) {
+                maior_prioridade = pronto[i]->prioridade;
+                index_maior = i;
+            }
+        }
+
+        // Nenhum processo pronto, CPU ociosa
+        if (index_maior == -1) {
+            tempo++;
+            continue;
+        }
+
+        // Executa uma unidade de tempo
+        pronto[index_maior]->remaining_time--;
+        pid = pronto[index_maior]->id;
+        timeline[pid * exec_time + tempo] = 2;
+        tempo++;
+
+        // Se processo terminou
+        if (pronto[index_maior]->remaining_time == 0) {
+            pronto[index_maior]->completion_time = tempo;
+            pronto[index_maior]->finished = 1;
+            pronto[index_maior] = pronto[pronto_tras--];
+            proc_concluidos++;
+        }
+    }
+
+    // Calcula turnaround e waiting time
+    for (int i = 0; i < qtd_task; i++) {
+        novo[i].turnaround_time = novo[i].completion_time - novo[i].arrival_time;
+        novo[i].waiting_time = novo[i].turnaround_time - novo[i].burst_time;
+    }
+
+    return timeline;
 }
 
 /*

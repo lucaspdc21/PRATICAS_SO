@@ -21,13 +21,13 @@ int* fcfs(Processo* processos, int qtd_task);
 int* sjf(Processo* processos, int qtd_task);
 
 // Shortest Remaining Time First
-int* srtf(Processo* processos, int qtd_task);
+int* srtf(Processo *novo, int qtd_task);
 
 // Prioridade cooperativo
-int* prioc(Processo* processos, int qtd_taskd);
+int* prioc(Processo* novo, int qtd_task);
 
 // Prioridade preemptivo
-int* priop(Processo* processos, int qtd_taskd);
+int* priop(Processo* novo, int qtd_task);
 
 // Round-Robin clássico (sem prioridade)
 int* rr(Processo* processos, int qtd_proc, int quantum);
