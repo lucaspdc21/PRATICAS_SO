@@ -110,7 +110,8 @@ int* prioc(Processo* novo, int qtd_task) {
         // Marcando processos prontos, mas não executados
         for (int i = 0; i <= pronto_tras; i++) {
             int pid = pronto[i]->id;
-            timeline[pid * exec_time + tempo] = 1;
+            for (int j = tempo_ant; j <= tempo; j++)
+                timeline[pid * exec_time + j] = 1;
         }
 
         // Seleciona processo com maior prioridade
