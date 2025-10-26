@@ -7,8 +7,8 @@
 #include <unistd.h>   
 
 #include <microhttpd.h>
-#include "cJSON.h" 
-#include "escalonadores.h"
+#include "../libs/cJSON.h" 
+#include "../include/escalonadores.h"
 
 #define PORT 8888
 #define STATIC_DOC_ROOT "public"

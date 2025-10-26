@@ -1,4 +1,4 @@
-#include "escalonadores.h"
+#include "../include/escalonadores.h"
 #include <stdlib.h>
 #include <limits.h> 
 
@@ -259,40 +259,49 @@ int* srtf(Processo *novo, int qtd_task, int* out_matrix_width, int* out_max_time
     return timeline;
 }
 
-// Prioridade cooperativo
+// Escalonamento por Prioridade Cooperativo (não preemptivo)
 int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_time) {
-    int tempo = 0,
-    tempo_ant = 0,
-    pid, tempo_proc,
-    proc_concluidos = 0,
-    pronto_tras = -1,
-    index_maior, maior_prioridade;
-    Processo *pronto[qtd_task];
+    int tempo = 0, tempo_ant = 0;
+    int pid, tempo_proc, proc_concluidos = 0;
+    int pronto_tras = -1, index_maior, maior_prioridade;
+
+    Processo* pronto[qtd_task];
+
+    // Inicializa tempos restantes e flags
     for (int i = 0; i < qtd_task; ++i) {
         novo[i].remaining_time = novo[i].burst_time;
         novo[i].finished = 0;
     }
 
-    // Usa estimativa para largura da matriz
+    // Estima tamanho inicial da matriz timeline
     int matrix_width = get_matrix_width_estimate(novo, qtd_task);
     *out_matrix_width = matrix_width;
     int* timeline = calloc(qtd_task * matrix_width, sizeof(int));
 
-    while(proc_concluidos < qtd_task) {
-        // Adiciona os processos novos que chegaram no array pronto
+    while (proc_concluidos < qtd_task) {
+
+        // 🔹 Adiciona processos que já chegaram e ainda não foram finalizados
         for (int i = 0; i < qtd_task; ++i) {
-            if (novo[i].finished != 1
-                && novo[i].arrival_time <= tempo
-                && novo[i].arrival_time >= tempo_ant)
-                pronto[++pronto_tras] = &novo[i];
+            if (!novo[i].finished && novo[i].arrival_time <= tempo) {
+                // Evita duplicar processo na fila pronto
+                int ja_presente = 0;
+                for (int j = 0; j <= pronto_tras; j++) {
+                    if (pronto[j] == &novo[i]) {
+                        ja_presente = 1;
+                        break;
+                    }
+                }
+                if (!ja_presente)
+                    pronto[++pronto_tras] = &novo[i];
+            }
         }
 
-        // Checa se precisa realocar
+        // 🔹 Checa se precisa realocar a timeline
         if (tempo >= matrix_width) {
             int nova_width = matrix_width * 2;
             int* new_timeline = calloc(qtd_task * nova_width, sizeof(int));
-            for(int p = 0; p < qtd_task; p++) {
-                for(int t = 0; t < matrix_width; t++) {
+            for (int p = 0; p < qtd_task; p++) {
+                for (int t = 0; t < matrix_width; t++) {
                     new_timeline[p * nova_width + t] = timeline[p * matrix_width + t];
                 }
             }
@@ -302,15 +311,18 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             *out_matrix_width = matrix_width;
         }
 
-        // Marcando processos prontos, mas não executados
+        // 🔹 Marca processos prontos (em espera)
         for (int i = 0; i <= pronto_tras; i++) {
-            int pid = pronto[i]->id;
-            for (int j = tempo_ant; j <= tempo; j++)
-                timeline[pid * matrix_width + j] = 1;
+            pid = pronto[i]->id;
+            for (int j = tempo_ant; j < tempo; j++) {
+                if (timeline[pid * matrix_width + j] == 0)
+                    timeline[pid * matrix_width + j] = 1;
+            }
         }
 
-        // Seleciona processo com maior prioridade
-        index_maior = -1, maior_prioridade = -1;
+        // 🔹 Seleciona o processo com maior prioridade
+        index_maior = -1;
+        maior_prioridade = -1;
         for (int i = 0; i <= pronto_tras; ++i) {
             if (pronto[i]->prioridade > maior_prioridade) {
                 maior_prioridade = pronto[i]->prioridade;
@@ -318,22 +330,24 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             }
         }
 
-        // Nenhum processo pronto, CPU ociosa
+        // 🔹 Nenhum processo pronto → CPU ociosa
         if (index_maior == -1) {
             tempo++;
             continue;
         }
 
-        // Executa o processo e finaliza-o
-        tempo_ant = tempo; // Correção: tempo_ant deve ser o tempo atual
+        // 🔹 Executa o processo selecionado (sem preempção)
+        if (pronto[index_maior]->remaining_time <= 0)
+            pronto[index_maior]->remaining_time = 0;
+
         tempo_proc = tempo + pronto[index_maior]->remaining_time;
-        
-        // Checa realocação antes de executar
+
+        // 🔹 Realoca se necessário
         if (tempo_proc >= matrix_width) {
-            int nova_width = tempo_proc * 2; // Garante espaço
+            int nova_width = tempo_proc * 2;
             int* new_timeline = calloc(qtd_task * nova_width, sizeof(int));
-            for(int p = 0; p < qtd_task; p++) {
-                for(int t = 0; t < matrix_width; t++) {
+            for (int p = 0; p < qtd_task; p++) {
+                for (int t = 0; t < matrix_width; t++) {
                     new_timeline[p * nova_width + t] = timeline[p * matrix_width + t];
                 }
             }
@@ -343,30 +357,42 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             *out_matrix_width = matrix_width;
         }
 
+        // 🔹 Marca execução contínua
+        pid = pronto[index_maior]->id;
         for (int i = tempo; i < tempo_proc; ++i) {
             pronto[index_maior]->remaining_time--;
-            pid = pronto[index_maior]->id;
-            timeline[pid * matrix_width + tempo] = 2;
-            tempo++;
+            timeline[pid * matrix_width + i] = 2;
         }
+
+        // 🔹 Atualiza estado do processo
+        tempo = tempo_proc;
+        tempo_ant = tempo;
         pronto[index_maior]->completion_time = tempo;
         pronto[index_maior]->finished = 1;
-        pronto[index_maior] = pronto[pronto_tras--];
+
+        // Remove da lista de prontos
+        if (pronto_tras >= 0) {
+            pronto[index_maior] = pronto[pronto_tras--];
+        } else {
+            pronto_tras = -1;
+        }
+
         proc_concluidos++;
     }
 
-    // Calcula turnaround e waiting time
+    // 🔹 Calcula turnaround e waiting time
     for (int i = 0; i < qtd_task; i++) {
         novo[i].turnaround_time = novo[i].completion_time - novo[i].arrival_time;
         novo[i].waiting_time = novo[i].turnaround_time - novo[i].burst_time;
     }
 
     *out_max_time = tempo;
-    // Realocar para tamanho exato
+
+    // 🔹 Reduz timeline para tamanho exato
     if (tempo < matrix_width) {
         int* new_timeline = calloc(qtd_task * tempo, sizeof(int));
-         for(int p = 0; p < qtd_task; p++) {
-            for(int t = 0; t < tempo; t++) {
+        for (int p = 0; p < qtd_task; p++) {
+            for (int t = 0; t < tempo; t++) {
                 new_timeline[p * tempo + t] = timeline[p * matrix_width + t];
             }
         }
@@ -374,9 +400,10 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
         timeline = new_timeline;
         *out_matrix_width = tempo;
     }
-    
+
     return timeline;
 }
+
 
 // Prioridade preemptivo
 int* priop(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_time) {
