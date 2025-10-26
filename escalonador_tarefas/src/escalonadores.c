@@ -280,7 +280,7 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
 
     while (proc_concluidos < qtd_task) {
 
-        // 🔹 Adiciona processos que já chegaram e ainda não foram finalizados
+        // Adiciona processos que já chegaram e ainda não foram finalizados
         for (int i = 0; i < qtd_task; ++i) {
             if (!novo[i].finished && novo[i].arrival_time <= tempo) {
                 // Evita duplicar processo na fila pronto
@@ -296,7 +296,7 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             }
         }
 
-        // 🔹 Checa se precisa realocar a timeline
+        // Checa se precisa realocar a timeline
         if (tempo >= matrix_width) {
             int nova_width = matrix_width * 2;
             int* new_timeline = calloc(qtd_task * nova_width, sizeof(int));
@@ -311,7 +311,7 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             *out_matrix_width = matrix_width;
         }
 
-        // 🔹 Marca processos prontos (em espera)
+        // Marca processos prontos (em espera)
         for (int i = 0; i <= pronto_tras; i++) {
             pid = pronto[i]->id;
             for (int j = tempo_ant; j < tempo; j++) {
@@ -320,7 +320,7 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             }
         }
 
-        // 🔹 Seleciona o processo com maior prioridade
+        // Seleciona o processo com maior prioridade
         index_maior = -1;
         maior_prioridade = -1;
         for (int i = 0; i <= pronto_tras; ++i) {
@@ -330,19 +330,19 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             }
         }
 
-        // 🔹 Nenhum processo pronto → CPU ociosa
+        // Nenhum processo pronto → CPU ociosa
         if (index_maior == -1) {
             tempo++;
             continue;
         }
 
-        // 🔹 Executa o processo selecionado (sem preempção)
+        // Executa o processo selecionado (sem preempção)
         if (pronto[index_maior]->remaining_time <= 0)
             pronto[index_maior]->remaining_time = 0;
 
         tempo_proc = tempo + pronto[index_maior]->remaining_time;
 
-        // 🔹 Realoca se necessário
+        // Realoca se necessário
         if (tempo_proc >= matrix_width) {
             int nova_width = tempo_proc * 2;
             int* new_timeline = calloc(qtd_task * nova_width, sizeof(int));
@@ -357,14 +357,14 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
             *out_matrix_width = matrix_width;
         }
 
-        // 🔹 Marca execução contínua
+        // Marca execução contínua
         pid = pronto[index_maior]->id;
         for (int i = tempo; i < tempo_proc; ++i) {
             pronto[index_maior]->remaining_time--;
             timeline[pid * matrix_width + i] = 2;
         }
 
-        // 🔹 Atualiza estado do processo
+        // Atualiza estado do processo
         tempo = tempo_proc;
         tempo_ant = tempo;
         pronto[index_maior]->completion_time = tempo;
@@ -380,7 +380,7 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
         proc_concluidos++;
     }
 
-    // 🔹 Calcula turnaround e waiting time
+    // Calcula turnaround e waiting time
     for (int i = 0; i < qtd_task; i++) {
         novo[i].turnaround_time = novo[i].completion_time - novo[i].arrival_time;
         novo[i].waiting_time = novo[i].turnaround_time - novo[i].burst_time;
@@ -388,7 +388,7 @@ int* prioc(Processo* novo, int qtd_task, int* out_matrix_width, int* out_max_tim
 
     *out_max_time = tempo;
 
-    // 🔹 Reduz timeline para tamanho exato
+    // Reduz timeline para tamanho exato
     if (tempo < matrix_width) {
         int* new_timeline = calloc(qtd_task * tempo, sizeof(int));
         for (int p = 0; p < qtd_task; p++) {
